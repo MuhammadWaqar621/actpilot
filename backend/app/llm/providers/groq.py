@@ -8,9 +8,21 @@ from app.core.config import get_settings
 GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 
 # Groq enforces quota per model independently, so if the configured model's
-# limit is hit, a different model can still have budget left. Same pattern
-# as the private-document-assistant project's groq_client.py.
-FALLBACK_MODELS = ["qwen/qwen3.8-27b", "openai/gpt-oss-20b"]
+# limit is hit, a different model can still have budget left.
+#
+# This list is vetted against ActPilot's OWN prompt (strict JSON with
+# string-typed element ids for fill/click actions), not just copied from
+# another project's chat-only vetting - tested live against
+# app.llm.service.SYSTEM_PROMPT on 2026-09-11:
+#   - openai/gpt-oss-20b, qwen/qwen3.6-27b: correct JSON, string ids - kept.
+#   - qwen/qwen3.8-27b: returned {"id": 0} (a number, not a string) for
+#     fill/click actions, which our schema validation then silently drops -
+#     the model "looks broken" here even though it's fine for plain chat.
+#     Excluded.
+#   - groq/compound, groq/compound-mini: correct JSON, but "compound" runs
+#     on top of gpt-oss-120b internally and shares its quota rather than
+#     having an independent one, so it isn't a real fallback. Excluded.
+FALLBACK_MODELS = ["openai/gpt-oss-20b", "qwen/qwen3.6-27b"]
 
 _MODEL_LIST_TTL_SECONDS = 3600
 _model_list_cache: set[str] = set()

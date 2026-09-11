@@ -153,6 +153,43 @@ def _parse_reply(raw: str, element_ids: set[str]) -> AgentReply:
     return AgentReply(answer=answer, actions=actions)
 
 
+def _call_provider(
+    provider: str,
+    *,
+    question: str,
+    url: str,
+    title: str,
+    page_text: str,
+    elements: list[dict],
+    screenshot_data_url: str | None,
+    history: list[dict[str, str]],
+) -> str:
+    """provider is "azure" (vision-capable) or "groq" (text-only - the
+    screenshot, if any, is dropped and the model is told so)."""
+    system = SYSTEM_PROMPT
+    include_image = provider == "azure"
+    if not include_image and screenshot_data_url:
+        system += (
+            "\n\nNote: a screenshot was captured for this page but is not available to you "
+            "on this fallback model - answer from the page text alone, and mention that "
+            "you couldn't see the screenshot if the question depends on visual layout."
+        )
+
+    messages = _build_messages(
+        question=question,
+        url=url,
+        title=title,
+        page_text=page_text,
+        elements=elements,
+        screenshot_data_url=screenshot_data_url if include_image else None,
+        history=history,
+        include_image=include_image,
+    )
+
+    client = azure_openai if provider == "azure" else groq
+    return client.chat(system=system, messages=messages, json_mode=True)
+
+
 def answer_page_question(
     *,
     question: str,
@@ -177,41 +214,29 @@ def answer_page_question(
             "(set AZURE_LLM_* or GROQ_API_KEY - see backend/.env.example)"
         )
 
-    if settings.azure_configured:
-        try:
-            messages = _build_messages(
-                question=question,
-                url=url,
-                title=title,
-                page_text=page_text,
-                elements=elements,
-                screenshot_data_url=screenshot_data_url,
-                history=history,
-                include_image=True,
-            )
-            raw = azure_openai.chat(system=SYSTEM_PROMPT, messages=messages, json_mode=True)
-            return _parse_reply(raw, element_ids)
-        except RateLimitError:
-            if not settings.groq_configured:
-                raise
+    configured = {"azure": settings.azure_configured, "groq": settings.groq_configured}
+    primary = settings.primary_provider if configured[settings.primary_provider] else None
+    fallback = next((p for p in ("azure", "groq") if p != primary and configured[p]), None)
 
-    # Fallback path: Groq is text-only, so the screenshot (if any) is dropped.
-    system = SYSTEM_PROMPT
-    if screenshot_data_url:
-        system += (
-            "\n\nNote: a screenshot was captured for this page but is not available to you "
-            "on this fallback model - answer from the page text alone, and mention that "
-            "you couldn't see the screenshot if the question depends on visual layout."
-        )
-    messages = _build_messages(
+    kwargs = dict(
         question=question,
         url=url,
         title=title,
         page_text=page_text,
         elements=elements,
-        screenshot_data_url=None,
+        screenshot_data_url=screenshot_data_url,
         history=history,
-        include_image=False,
     )
-    raw = groq.chat(system=system, messages=messages, json_mode=True)
+
+    if primary:
+        try:
+            raw = _call_provider(primary, **kwargs)
+            return _parse_reply(raw, element_ids)
+        except RateLimitError:
+            if not fallback:
+                raise
+    else:
+        fallback = fallback or next(p for p in ("azure", "groq") if configured[p])
+
+    raw = _call_provider(fallback, **kwargs)
     return _parse_reply(raw, element_ids)

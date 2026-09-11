@@ -8,8 +8,13 @@ DEFAULT_CHAT_API_VERSION = "2024-08-01-preview"
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    # Primary chat provider: Azure OpenAI (vision-capable - needed to read
-    # the page screenshot). Falls back to Groq automatically on rate-limit.
+    # Which provider serves chat completions first - "azure" (default) or
+    # "groq". Whichever is NOT primary is still used as the automatic
+    # fallback on a rate-limit error, as long as it's configured. Azure is
+    # the default primary because it's vision-capable (needed for
+    # screenshot analysis) and Groq is not.
+    llm_provider: str = "azure"
+
     azure_llm_endpoint: str = ""
     azure_llm_api_key: str = ""
     azure_llm_model: str = "gpt-4o-mini"
@@ -34,6 +39,10 @@ class Settings(BaseSettings):
     @property
     def groq_configured(self) -> bool:
         return bool(self.groq_api_key)
+
+    @property
+    def primary_provider(self) -> str:
+        return "groq" if self.llm_provider.strip().lower() == "groq" else "azure"
 
 
 @lru_cache
