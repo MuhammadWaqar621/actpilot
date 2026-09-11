@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="680" height="460" viewBox="0 0 340 230" fill="none" role="img" aria-label="ActPilot">
+  <g transform="translate(170,74)">
+    <path d="M-38 20 A 44 44 0 1 1 26 38" stroke="#FFFFFF" stroke-width="10" stroke-linecap="round" fill="none"></path>
+    <g transform="rotate(-12) translate(-16,-30)">
+      <path d="M0 0 L0 58 L15 43 L26 66 L38 61 L27 38 L46 38 Z" fill="#0B0B0B" stroke="#0B0B0B" stroke-width="11" stroke-linejoin="round"></path>
+      <path d="M0 0 L0 58 L15 43 L26 66 L38 61 L27 38 L46 38 Z" fill="#EA580C"></path>
+    </g>
+  </g>
+  <text x="170" y="190" text-anchor="middle" fill="#FFFFFF" font-family="Georgia, 'Times New Roman', serif" font-size="60" letter-spacing="-1.5">ActPilot</text>
+  <text x="170" y="216" text-anchor="middle" fill="#F59E7B" font-family="Helvetica, Arial, sans-serif" font-size="12" font-weight="500" letter-spacing="6">ASK. ACT. DONE.</text>
+</svg>

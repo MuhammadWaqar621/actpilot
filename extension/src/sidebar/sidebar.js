@@ -14,8 +14,18 @@ const formEl = document.getElementById("chatForm");
 const questionEl = document.getElementById("question");
 const sendBtn = document.getElementById("sendBtn");
 const downloadBtn = document.getElementById("downloadBtn");
+const logoEl = document.getElementById("logo");
 
 let history = [];
+
+// Swap the wordmark to match the browser/OS theme, same as the rest of the
+// UI (which follows prefers-color-scheme via CSS custom properties).
+const darkModeQuery = window.matchMedia("(prefers-color-scheme: dark)");
+function updateLogo() {
+  logoEl.src = darkModeQuery.matches ? "../icons/actpilot-logo-dark.svg" : "../icons/actpilot-logo-light.svg";
+}
+updateLogo();
+darkModeQuery.addEventListener("change", updateLogo);
 
 function truncate(text, max) {
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;
@@ -24,6 +34,9 @@ function truncate(text, max) {
 // Keeps a persistent "Reading: <page title>" indicator so it's always
 // obvious which page's content ActPilot is using as context.
 async function updatePageContextBanner() {
+  updateLogo(); // opportunistic re-check - a side panel often gets reopened
+  // rather than staying open across a real theme change, so re-syncing here
+  // (a natural "wake" point) is a cheap backstop alongside the change listener.
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (tab?.title) {

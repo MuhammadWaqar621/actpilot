@@ -1,3 +1,73 @@
+:root {
+  --bg: #ffffff;
+  --fg: #1a1a1a;
+  --muted: #555555;
+  --border: #e2e2e2;
+  --surface: #f6f7fb;
+  --accent: #2563eb;
+  --accent-fg: #ffffff;
+
+  --bubble-user-bg: #2563eb;
+  --bubble-user-fg: #ffffff;
+  --bubble-assistant-bg: #f1f1f1;
+  --bubble-assistant-fg: #1a1a1a;
+  --bubble-error-bg: #fdecec;
+  --bubble-error-fg: #b42318;
+  --bubble-upgrade-bg: #fff7e6;
+  --bubble-upgrade-border: #f0d38a;
+
+  --chip-bg: #ffffff;
+  --chip-border: #d6d6d6;
+  --chip-hover: #f1f1f1;
+
+  --menu-bg: #ffffff;
+  --menu-border: #dddddd;
+  --menu-hover: #f1f1f1;
+
+  --input-bg: #ffffff;
+  --input-border: #cccccc;
+
+  --code-bg: rgba(0, 0, 0, 0.08);
+  --action-hover: rgba(0, 0, 0, 0.06);
+  --action-note: #1a7f37;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1e1f22;
+    --fg: #e8e8e8;
+    --muted: #a0a0a0;
+    --border: #3a3b3e;
+    --surface: #26272b;
+    --accent: #5b8def;
+    --accent-fg: #ffffff;
+
+    --bubble-user-bg: #3b6fe0;
+    --bubble-user-fg: #ffffff;
+    --bubble-assistant-bg: #2c2d31;
+    --bubble-assistant-fg: #e8e8e8;
+    --bubble-error-bg: #3a2323;
+    --bubble-error-fg: #ff8a8a;
+    --bubble-upgrade-bg: #332c1a;
+    --bubble-upgrade-border: #6b571f;
+
+    --chip-bg: #2c2d31;
+    --chip-border: #45464a;
+    --chip-hover: #35363a;
+
+    --menu-bg: #2c2d31;
+    --menu-border: #45464a;
+    --menu-hover: #35363a;
+
+    --input-bg: #26272b;
+    --input-border: #45464a;
+
+    --code-bg: rgba(255, 255, 255, 0.12);
+    --action-hover: rgba(255, 255, 255, 0.1);
+    --action-note: #6bd68a;
+  }
+}
+
 * {
   box-sizing: border-box;
 }
@@ -9,26 +79,28 @@ body {
   height: 100vh;
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   font-size: 14px;
-  color: #1a1a1a;
+  background: var(--bg);
+  color: var(--fg);
 }
 
 header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 12px;
-  border-bottom: 1px solid #e2e2e2;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
 }
 
-header h1 {
-  font-size: 15px;
-  margin: 0;
+#logo {
+  height: 26px;
+  width: auto;
+  display: block;
 }
 
 #downloadBtn {
   border: none;
   background: transparent;
-  color: #2563eb;
+  color: var(--accent);
   font-size: 12px;
   padding: 4px 8px;
   border-radius: 6px;
@@ -36,15 +108,15 @@ header h1 {
 }
 
 #downloadBtn:hover {
-  background: rgba(37, 99, 235, 0.1);
+  background: var(--action-hover);
 }
 
 #pageContext {
   padding: 6px 12px;
   font-size: 12px;
-  color: #555;
-  background: #f6f7fb;
-  border-top: 1px solid #e2e2e2;
+  color: var(--muted);
+  background: var(--surface);
+  border-top: 1px solid var(--border);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -64,13 +136,13 @@ main#messages {
   flex-wrap: wrap;
   gap: 6px;
   padding: 10px 12px;
-  border-top: 1px solid #e2e2e2;
+  border-top: 1px solid var(--border);
 }
 
 .chip {
-  border: 1px solid #d6d6d6;
-  background: white;
-  color: #333;
+  border: 1px solid var(--chip-border);
+  background: var(--chip-bg);
+  color: var(--fg);
   font-size: 12.5px;
   padding: 6px 10px;
   border-radius: 999px;
@@ -78,7 +150,7 @@ main#messages {
 }
 
 .chip:hover {
-  background: #f1f1f1;
+  background: var(--chip-hover);
 }
 
 .msg {
@@ -91,31 +163,33 @@ main#messages {
 
 .msg.user {
   align-self: flex-end;
-  background: #2563eb;
-  color: white;
+  background: var(--bubble-user-bg);
+  color: var(--bubble-user-fg);
 }
 
 .msg.assistant {
   align-self: flex-start;
-  background: #f1f1f1;
+  background: var(--bubble-assistant-bg);
+  color: var(--bubble-assistant-fg);
 }
 
 .msg.error {
   align-self: flex-start;
-  background: #fdecec;
-  color: #b42318;
+  background: var(--bubble-error-bg);
+  color: var(--bubble-error-fg);
 }
 
 .action-note {
   margin-top: 6px !important;
   font-size: 12px;
-  color: #1a7f37;
+  color: var(--action-note);
 }
 
 .msg.upgrade {
   align-self: flex-start;
-  background: #fff7e6;
-  border: 1px solid #f0d38a;
+  background: var(--bubble-upgrade-bg);
+  border: 1px solid var(--bubble-upgrade-border);
+  color: var(--fg);
 }
 
 .msg.assistant .msg-text {
@@ -141,7 +215,7 @@ main#messages {
 }
 
 .msg-text code {
-  background: rgba(0, 0, 0, 0.08);
+  background: var(--code-bg);
   padding: 1px 4px;
   border-radius: 4px;
   font-family: ui-monospace, Consolas, monospace;
@@ -158,8 +232,8 @@ main#messages {
 .upgrade-btn {
   display: block;
   margin-top: 6px;
-  background: #2563eb;
-  color: white;
+  background: var(--accent);
+  color: var(--accent-fg);
 }
 
 .msg-actions {
@@ -171,7 +245,7 @@ main#messages {
 .action-btn {
   border: none;
   background: transparent;
-  color: #555;
+  color: var(--muted);
   font-size: 12px;
   padding: 2px 6px;
   border-radius: 5px;
@@ -179,7 +253,7 @@ main#messages {
 }
 
 .action-btn:hover {
-  background: rgba(0, 0, 0, 0.06);
+  background: var(--action-hover);
 }
 
 .redo-wrap {
@@ -192,10 +266,10 @@ main#messages {
   bottom: 100%;
   left: 0;
   margin-bottom: 4px;
-  background: white;
-  border: 1px solid #ddd;
+  background: var(--menu-bg);
+  border: 1px solid var(--menu-border);
   border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
   flex-direction: column;
   min-width: 110px;
   overflow: hidden;
@@ -212,34 +286,37 @@ main#messages {
   text-align: left;
   padding: 6px 10px;
   font-size: 12px;
+  color: var(--fg);
   cursor: pointer;
 }
 
 .redo-menu button:hover {
-  background: #f1f1f1;
+  background: var(--menu-hover);
 }
 
 #chatForm {
   display: flex;
   gap: 8px;
   padding: 10px 12px;
-  border-top: 1px solid #e2e2e2;
+  border-top: 1px solid var(--border);
 }
 
 #question {
   flex: 1;
   resize: none;
   padding: 8px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--input-border);
   border-radius: 8px;
   font-family: inherit;
   font-size: 14px;
+  background: var(--input-bg);
+  color: var(--fg);
 }
 
 #sendBtn {
   border: none;
-  background: #2563eb;
-  color: white;
+  background: var(--accent);
+  color: var(--accent-fg);
   border-radius: 8px;
   padding: 0 16px;
   cursor: pointer;
