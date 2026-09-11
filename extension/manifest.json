@@ -5,11 +5,21 @@
   "description": "AI agent that reads the page you're on and answers questions about it.",
   "permissions": ["sidePanel", "storage", "activeTab", "scripting"],
   "host_permissions": ["<all_urls>"],
+  "icons": {
+    "16": "src/icons/icon16.png",
+    "48": "src/icons/icon48.png",
+    "128": "src/icons/icon128.png"
+  },
   "background": {
     "service_worker": "src/background/background.js"
   },
   "action": {
-    "default_title": "Open ActPilot"
+    "default_title": "Open ActPilot",
+    "default_icon": {
+      "16": "src/icons/icon16.png",
+      "48": "src/icons/icon48.png",
+      "128": "src/icons/icon128.png"
+    }
   },
   "side_panel": {
     "default_path": "src/sidebar/sidebar.html"
