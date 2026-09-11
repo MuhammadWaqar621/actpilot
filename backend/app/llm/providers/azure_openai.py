@@ -15,12 +15,14 @@ def get_client() -> AzureOpenAI:
     )
 
 
-def chat(*, system: str, messages: list[dict]) -> str:
+def chat(*, system: str, messages: list[dict], json_mode: bool = False) -> str:
     settings = get_settings()
     client = get_client()
+    extra = {"response_format": {"type": "json_object"}} if json_mode else {}
     response = client.chat.completions.create(
         model=settings.azure_llm_model,
         messages=[{"role": "system", "content": system}, *messages],
         max_tokens=1024,
+        **extra,
     )
     return response.choices[0].message.content or ""

@@ -123,7 +123,7 @@ function closeAllRedoMenus() {
   document.querySelectorAll(".redo-menu.open").forEach((menu) => menu.classList.remove("open"));
 }
 
-function attachActions(bubble, exchange) {
+function attachMessageActions(bubble, exchange) {
   const actions = document.createElement("div");
   actions.className = "msg-actions";
 
@@ -184,6 +184,13 @@ async function getActiveTab() {
   return tab;
 }
 
+function withTimeout(promise, ms, fallback) {
+  return Promise.race([
+    promise,
+    new Promise((resolve) => setTimeout(() => resolve(fallback), ms)),
+  ]);
+}
+
 async function getPageData(tabId) {
   try {
     return await chrome.tabs.sendMessage(tabId, { type: "GET_PAGE_DATA" });
@@ -210,11 +217,59 @@ async function getScreenshot() {
   });
 }
 
+// Runs each returned action against the real page. "fill"/"click" target
+// elements by the data-actpilot-id the content script assigned during
+// extraction - never a raw selector the model made up.
+async function executeActions(tabId, actions) {
+  const done = [];
+  for (const action of actions) {
+    try {
+      if (action.type === "open_url") {
+        await chrome.tabs.create({ url: action.url, active: false });
+        done.push("Opened a new tab");
+      } else if (action.type === "fill") {
+        await chrome.scripting.executeScript({
+          target: { tabId },
+          func: (id, value) => {
+            const el = document.querySelector(`[data-actpilot-id="${id}"]`);
+            if (!el) return false;
+            el.focus();
+            el.value = value;
+            el.dispatchEvent(new Event("input", { bubbles: true }));
+            el.dispatchEvent(new Event("change", { bubbles: true }));
+            return true;
+          },
+          args: [action.id, action.value],
+        });
+        done.push("Filled a field");
+      } else if (action.type === "click") {
+        await chrome.scripting.executeScript({
+          target: { tabId },
+          func: (id) => {
+            const el = document.querySelector(`[data-actpilot-id="${id}"]`);
+            if (!el) return false;
+            el.click();
+            return true;
+          },
+          args: [action.id],
+        });
+        done.push("Clicked an element");
+      }
+    } catch {
+      // Element may have disappeared/re-rendered since extraction - skip it.
+    }
+  }
+  return done;
+}
+
 async function askBackend(question, historyForContext) {
   const tab = await getActiveTab();
   if (!tab?.id) throw new Error("No active tab found.");
 
-  const [pageData, screenshot] = await Promise.all([getPageData(tab.id), getScreenshot()]);
+  const [pageData, screenshot] = await Promise.all([
+    withTimeout(getPageData(tab.id), 8000, null),
+    withTimeout(getScreenshot(), 8000, null),
+  ]);
 
   const res = await fetch(`${BACKEND_URL}/api/analyze`, {
     method: "POST",
@@ -226,6 +281,7 @@ async function askBackend(question, historyForContext) {
         title: pageData?.title || tab.title || "",
         text: pageData?.text || "",
         screenshot,
+        elements: pageData?.elements || [],
       },
       history: historyForContext,
     }),
@@ -245,7 +301,13 @@ async function askBackend(question, historyForContext) {
   }
 
   const data = await res.json();
-  return data.answer;
+
+  let actionsSummary = [];
+  if (data.actions?.length) {
+    actionsSummary = await executeActions(tab.id, data.actions);
+  }
+
+  return { answer: data.answer, actionsSummary };
 }
 
 // --- Free-tier message cap ------------------------------------------------
@@ -287,7 +349,7 @@ async function regenerate(exchange, mode) {
   exchange.textEl.textContent = "Thinking…";
 
   try {
-    const answer = await askBackend(question, history.slice(0, exchange.historyIndex - 1));
+    const { answer } = await askBackend(question, history.slice(0, exchange.historyIndex - 1));
     renderMarkdown(exchange.textEl, answer);
     exchange.rawText = answer;
     history[exchange.historyIndex] = { role: "assistant", text: answer };
@@ -310,19 +372,32 @@ suggestionsEl.querySelectorAll(".chip").forEach((chip) => {
   chip.addEventListener("click", () => fillAndSend(chip.textContent));
 });
 
-downloadBtn.addEventListener("click", () => {
+downloadBtn.addEventListener("click", async () => {
   if (history.length === 0) return;
-  const lines = [];
-  for (let i = 0; i < history.length; i += 2) {
-    lines.push(`You: ${history[i]?.text ?? ""}`, "", `ActPilot: ${history[i + 1]?.text ?? ""}`, "", "---", "");
+  downloadBtn.disabled = true;
+  downloadBtn.textContent = "…";
+  try {
+    const tab = await getActiveTab();
+    const res = await fetch(`${BACKEND_URL}/api/export-chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages: history, page_title: tab?.title || "" }),
+    });
+    if (!res.ok) throw new Error(`Request failed (${res.status})`);
+
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `actpilot-chat-${Date.now()}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    alert(`Couldn't download the chat: ${err.message}`);
+  } finally {
+    downloadBtn.disabled = false;
+    downloadBtn.textContent = "Download";
   }
-  const blob = new Blob([lines.join("\n")], { type: "text/plain" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `actpilot-chat-${Date.now()}.txt`;
-  a.click();
-  URL.revokeObjectURL(url);
 });
 
 questionEl.addEventListener("keydown", (event) => {
@@ -343,13 +418,19 @@ formEl.addEventListener("submit", async (event) => {
   const pending = addMessage("assistant", "Thinking…");
 
   try {
-    const answer = await askBackend(question, history);
+    const { answer, actionsSummary } = await askBackend(question, history);
     renderMarkdown(pending.textEl, answer);
+    if (actionsSummary.length) {
+      const note = document.createElement("p");
+      note.className = "action-note";
+      note.textContent = `✓ ${actionsSummary.join(", ")}`;
+      pending.textEl.appendChild(note);
+    }
 
     history.push({ role: "user", text: question });
     history.push({ role: "assistant", text: answer });
 
-    attachActions(pending, {
+    attachMessageActions(pending, {
       question,
       textEl: pending.textEl,
       rawText: answer,

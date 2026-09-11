@@ -1,8 +1,9 @@
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Response
 
-from app.api.schemas import AnalyzeRequest, AnalyzeResponse
+from app.api.schemas import AnalyzeRequest, AnalyzeResponse, BrowserAction, ExportChatRequest
 from app.core import rate_limit
 from app.core.config import get_settings
+from app.core.pdf_export import build_chat_pdf
 from app.llm.service import answer_page_question
 
 router = APIRouter()
@@ -35,15 +36,31 @@ def analyze(request: AnalyzeRequest, http_request: Request) -> AnalyzeResponse:
         )
 
     try:
-        answer = answer_page_question(
+        reply = answer_page_question(
             question=request.question,
             url=request.page.url,
             title=request.page.title,
             page_text=request.page.text,
+            elements=[el.model_dump() for el in request.page.elements],
             screenshot_data_url=request.page.screenshot,
             history=[{"role": turn.role, "content": turn.text} for turn in request.history],
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    return AnalyzeResponse(answer=answer)
+    return AnalyzeResponse(
+        answer=reply.answer, actions=[BrowserAction(**a) for a in reply.actions]
+    )
+
+
+@router.post("/export-chat")
+def export_chat(request: ExportChatRequest) -> Response:
+    pdf_bytes = build_chat_pdf(
+        messages=[{"role": turn.role, "text": turn.text} for turn in request.messages],
+        page_title=request.page_title,
+    )
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": 'attachment; filename="actpilot-chat.pdf"'},
+    )

@@ -41,9 +41,10 @@ def _live_model_chain(primary: str, client: OpenAI) -> list[str]:
     return chain or vetted
 
 
-def chat(*, system: str, messages: list[dict]) -> str:
+def chat(*, system: str, messages: list[dict], json_mode: bool = False) -> str:
     settings = get_settings()
     client = get_client()
+    extra = {"response_format": {"type": "json_object"}} if json_mode else {}
 
     last_exc: Exception | None = None
     for model in _live_model_chain(settings.groq_llm_model, client):
@@ -52,6 +53,7 @@ def chat(*, system: str, messages: list[dict]) -> str:
                 model=model,
                 messages=[{"role": "system", "content": system}, *messages],
                 max_tokens=1024,
+                **extra,
             )
             return response.choices[0].message.content or ""
         except RateLimitError as exc:
