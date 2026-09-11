@@ -65,18 +65,49 @@ def build_chat_pdf(messages: list[dict], page_title: str | None = None) -> bytes
     pdf.line(10, pdf.get_y(), 200, pdf.get_y())
     pdf.ln(6)
 
+    # Chat-bubble layout matching the extension's sidebar UI: user messages
+    # right-aligned in blue, ActPilot's left-aligned in light gray - color
+    # and side alone identify the speaker, same as the real chat, so no
+    # "You"/"ActPilot" text labels are drawn here either. Bubbles hug their
+    # own text (like the real CSS max-width bubbles) instead of all being
+    # the same fixed width.
+    content_width = pdf.w - pdf.l_margin - pdf.r_margin
+    max_text_width = content_width * 0.72 - 8
+    padding = 4
+    line_height = 6
+    min_text_width = 15
+
+    pdf.set_font(font, "", 10.5)
+
     for msg in messages:
         is_user = msg["role"] == "user"
-        label = "You" if is_user else "ActPilot"
-        color = DARK if is_user else BLUE
+        text = _strip_markdown(msg["text"])
+        fill = BLUE if is_user else (241, 241, 241)
+        text_color = (255, 255, 255) if is_user else DARK
 
-        pdf.set_font(font, "B", 11)
-        pdf.set_text_color(*color)
-        pdf.cell(0, 6, label, new_x="LMARGIN", new_y="NEXT")
+        lines = pdf.multi_cell(max_text_width, line_height, text, dry_run=True, output="LINES")
+        longest_line = max((pdf.get_string_width(line) for line in lines), default=0)
+        text_width = max(min_text_width, min(max_text_width, longest_line + 2))
+        # Re-measure at the exact width we'll actually draw with - fpdf2's
+        # internal cell margins mean a width sized to the raw string width
+        # can still wrap into an extra line, so trust this final line count.
+        final_lines = pdf.multi_cell(text_width, line_height, text, dry_run=True, output="LINES")
+        bubble_width = text_width + 2 * padding
+        bubble_height = len(final_lines) * line_height + 2 * padding
 
-        pdf.set_font(font, "", 10.5)
-        pdf.set_text_color(*DARK)
-        pdf.multi_cell(0, 6, _strip_markdown(msg["text"]))
-        pdf.ln(4)
+        if pdf.get_y() + bubble_height > pdf.page_break_trigger:
+            pdf.add_page()
+
+        x = pdf.l_margin + content_width - bubble_width if is_user else pdf.l_margin
+        y = pdf.get_y()
+
+        pdf.set_fill_color(*fill)
+        pdf.rect(x, y, bubble_width, bubble_height, style="F", round_corners=True, corner_radius=2)
+
+        pdf.set_xy(x + padding, y + padding)
+        pdf.set_text_color(*text_color)
+        pdf.multi_cell(text_width, line_height, text, align="L")
+
+        pdf.set_y(y + bubble_height + 4)
 
     return bytes(pdf.output())
