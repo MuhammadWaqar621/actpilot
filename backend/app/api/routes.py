@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException
 
 from app.api.schemas import AnalyzeRequest, AnalyzeResponse
 from app.core.config import get_settings
-from app.llm.claude_client import answer_page_question
+from app.llm.service import answer_page_question
 
 router = APIRouter()
 
@@ -15,10 +15,11 @@ def health() -> dict[str, str]:
 @router.post("/analyze", response_model=AnalyzeResponse)
 def analyze(request: AnalyzeRequest) -> AnalyzeResponse:
     settings = get_settings()
-    if not settings.anthropic_api_key:
+    if not settings.azure_configured and not settings.groq_configured:
         raise HTTPException(
             status_code=500,
-            detail="ANTHROPIC_API_KEY is not configured on the backend (see backend/.env.example)",
+            detail="No LLM provider is configured on the backend "
+            "(set AZURE_LLM_* or GROQ_API_KEY - see backend/.env.example)",
         )
 
     try:
