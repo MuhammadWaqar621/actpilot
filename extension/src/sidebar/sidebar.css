@@ -15,6 +15,7 @@ body {
 header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   padding: 10px 12px;
   border-bottom: 1px solid #e2e2e2;
 }
@@ -24,6 +25,31 @@ header h1 {
   margin: 0;
 }
 
+#downloadBtn {
+  border: none;
+  background: transparent;
+  color: #2563eb;
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+#downloadBtn:hover {
+  background: rgba(37, 99, 235, 0.1);
+}
+
+#pageContext {
+  padding: 6px 12px;
+  font-size: 12px;
+  color: #555;
+  background: #f6f7fb;
+  border-bottom: 1px solid #e2e2e2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 main#messages {
   flex: 1;
   overflow-y: auto;
@@ -31,6 +57,26 @@ main#messages {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+#suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  border: 1px solid #d6d6d6;
+  background: white;
+  color: #333;
+  font-size: 12.5px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.chip:hover {
+  background: #f1f1f1;
 }
 
 .msg {
@@ -56,6 +102,49 @@ main#messages {
   align-self: flex-start;
   background: #fdecec;
   color: #b42318;
+}
+
+.msg.upgrade {
+  align-self: flex-start;
+  background: #fff7e6;
+  border: 1px solid #f0d38a;
+}
+
+.msg.assistant .msg-text {
+  white-space: normal;
+}
+
+.msg-text p {
+  margin: 0 0 6px;
+}
+
+.msg-text p:last-child {
+  margin-bottom: 0;
+}
+
+.msg-text ul,
+.msg-text ol {
+  margin: 4px 0 6px;
+  padding-left: 20px;
+}
+
+.msg-text li {
+  margin-bottom: 2px;
+}
+
+.msg-text code {
+  background: rgba(0, 0, 0, 0.08);
+  padding: 1px 4px;
+  border-radius: 4px;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 12.5px;
+}
+
+.upgrade-btn {
+  display: block;
+  margin-top: 6px;
+  background: #2563eb;
+  color: white;
 }
 
 .msg-actions {

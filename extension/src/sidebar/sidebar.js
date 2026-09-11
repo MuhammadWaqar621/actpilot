@@ -1,4 +1,5 @@
 const BACKEND_URL = "http://localhost:8000";
+const FREE_MESSAGE_LIMIT = 50;
 
 const REDO_MODIFIERS = {
   retry: null,
@@ -7,13 +8,106 @@ const REDO_MODIFIERS = {
 };
 
 const messagesEl = document.getElementById("messages");
+const suggestionsEl = document.getElementById("suggestions");
+const pageContextEl = document.getElementById("pageContext");
 const formEl = document.getElementById("chatForm");
 const questionEl = document.getElementById("question");
 const sendBtn = document.getElementById("sendBtn");
+const downloadBtn = document.getElementById("downloadBtn");
 
 let history = [];
 
+function truncate(text, max) {
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+}
+
+// Keeps a persistent "Reading: <page title>" indicator so it's always
+// obvious which page's content ActPilot is using as context.
+async function updatePageContextBanner() {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab?.title) {
+      pageContextEl.textContent = `Reading: ${truncate(tab.title, 60)}`;
+      pageContextEl.hidden = false;
+    } else {
+      pageContextEl.hidden = true;
+    }
+  } catch {
+    pageContextEl.hidden = true;
+  }
+}
+
+updatePageContextBanner();
+chrome.tabs.onActivated.addListener(updatePageContextBanner);
+chrome.tabs.onUpdated.addListener((_tabId, changeInfo) => {
+  if (changeInfo.title || changeInfo.status === "complete") updatePageContextBanner();
+});
+
+// --- Minimal, safe markdown rendering (bold/italic/code/lists/paragraphs) --
+// Builds real DOM nodes via createElement/textContent only - never innerHTML
+// with model output, since that text ultimately derives from page content
+// the LLM reads and could otherwise be an XSS vector.
+
+function appendInline(parent, text) {
+  const regex = /\*\*(.+?)\*\*|`(.+?)`|\*(.+?)\*/g;
+  let lastIndex = 0;
+  let match;
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parent.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
+    }
+    if (match[1] !== undefined) {
+      const strong = document.createElement("strong");
+      strong.textContent = match[1];
+      parent.appendChild(strong);
+    } else if (match[2] !== undefined) {
+      const code = document.createElement("code");
+      code.textContent = match[2];
+      parent.appendChild(code);
+    } else {
+      const em = document.createElement("em");
+      em.textContent = match[3];
+      parent.appendChild(em);
+    }
+    lastIndex = regex.lastIndex;
+  }
+  if (lastIndex < text.length) {
+    parent.appendChild(document.createTextNode(text.slice(lastIndex)));
+  }
+}
+
+function renderMarkdown(container, text) {
+  container.replaceChildren();
+  const lines = text.split("\n");
+  let listEl = null;
+
+  for (const line of lines) {
+    const bulletMatch = line.match(/^\s*[-*]\s+(.*)/);
+    const numberedMatch = line.match(/^\s*\d+[.)]\s+(.*)/);
+
+    if (bulletMatch || numberedMatch) {
+      const tag = bulletMatch ? "ul" : "ol";
+      if (!listEl || listEl.tagName.toLowerCase() !== tag) {
+        listEl = document.createElement(tag);
+        container.appendChild(listEl);
+      }
+      const li = document.createElement("li");
+      appendInline(li, (bulletMatch || numberedMatch)[1]);
+      listEl.appendChild(li);
+      continue;
+    }
+
+    listEl = null;
+    if (line.trim() === "") continue;
+
+    const p = document.createElement("p");
+    appendInline(p, line);
+    container.appendChild(p);
+  }
+}
+
 function addMessage(role, text) {
+  suggestionsEl.hidden = true;
   const el = document.createElement("div");
   el.className = `msg ${role}`;
   const textEl = document.createElement("div");
@@ -38,7 +132,7 @@ function attachActions(bubble, exchange) {
   copyBtn.textContent = "Copy";
   copyBtn.addEventListener("click", async () => {
     try {
-      await navigator.clipboard.writeText(exchange.textEl.textContent);
+      await navigator.clipboard.writeText(exchange.rawText);
       copyBtn.textContent = "Copied";
     } catch {
       copyBtn.textContent = "Couldn't copy";
@@ -137,6 +231,14 @@ async function askBackend(question, historyForContext) {
     }),
   });
 
+  if (res.status === 429) {
+    const body = await res.json().catch(() => ({}));
+    const err = new Error(body.detail?.message || "Free limit reached.");
+    err.isRateLimit = true;
+    err.resetInSeconds = body.detail?.reset_in_seconds ?? null;
+    throw err;
+  }
+
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.detail || `Request failed (${res.status})`);
@@ -146,22 +248,82 @@ async function askBackend(question, historyForContext) {
   return data.answer;
 }
 
+// --- Free-tier message cap ------------------------------------------------
+// Enforced server-side (see backend/app/core/rate_limit.py), keyed by
+// client IP with a rolling 2-hour window - not just client storage, so it
+// can't be reset by clearing the extension's local data.
+
+function formatResetTime(seconds) {
+  if (seconds == null) return "";
+  const mins = Math.max(1, Math.round(seconds / 60));
+  if (mins < 60) return `Try again in about ${mins} minute${mins === 1 ? "" : "s"}.`;
+  const hours = Math.round(mins / 60);
+  return `Try again in about ${hours} hour${hours === 1 ? "" : "s"}.`;
+}
+
+function showUpgradePrompt(resetInSeconds) {
+  const { el } = addMessage("assistant", "");
+  el.classList.add("upgrade");
+  const textEl = el.querySelector(".msg-text");
+
+  const p = document.createElement("p");
+  p.textContent = `You've reached the free limit of ${FREE_MESSAGE_LIMIT} messages. ${formatResetTime(resetInSeconds)}`;
+  textEl.appendChild(p);
+
+  const upgradeBtn = document.createElement("button");
+  upgradeBtn.className = "action-btn upgrade-btn";
+  upgradeBtn.textContent = "Upgrade";
+  upgradeBtn.addEventListener("click", () => {
+    alert("Upgrades aren't available yet - check back soon.");
+  });
+  textEl.appendChild(upgradeBtn);
+}
+
 async function regenerate(exchange, mode) {
   const modifier = REDO_MODIFIERS[mode];
   const question = modifier ? `${exchange.question}\n\n(${modifier})` : exchange.question;
 
-  const previousText = exchange.textEl.textContent;
+  const previousText = exchange.rawText;
   exchange.textEl.textContent = "Thinking…";
 
   try {
     const answer = await askBackend(question, history.slice(0, exchange.historyIndex - 1));
-    exchange.textEl.textContent = answer;
+    renderMarkdown(exchange.textEl, answer);
+    exchange.rawText = answer;
     history[exchange.historyIndex] = { role: "assistant", text: answer };
   } catch (err) {
-    exchange.textEl.textContent = previousText;
-    alert(`Couldn't regenerate: ${err.message}`);
+    renderMarkdown(exchange.textEl, previousText);
+    if (err.isRateLimit) {
+      showUpgradePrompt(err.resetInSeconds);
+    } else {
+      alert(`Couldn't regenerate: ${err.message}`);
+    }
   }
 }
+
+function fillAndSend(text) {
+  questionEl.value = text;
+  formEl.requestSubmit();
+}
+
+suggestionsEl.querySelectorAll(".chip").forEach((chip) => {
+  chip.addEventListener("click", () => fillAndSend(chip.textContent));
+});
+
+downloadBtn.addEventListener("click", () => {
+  if (history.length === 0) return;
+  const lines = [];
+  for (let i = 0; i < history.length; i += 2) {
+    lines.push(`You: ${history[i]?.text ?? ""}`, "", `ActPilot: ${history[i + 1]?.text ?? ""}`, "", "---", "");
+  }
+  const blob = new Blob([lines.join("\n")], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `actpilot-chat-${Date.now()}.txt`;
+  a.click();
+  URL.revokeObjectURL(url);
+});
 
 questionEl.addEventListener("keydown", (event) => {
   if (event.key === "Enter" && !event.shiftKey) {
@@ -182,15 +344,25 @@ formEl.addEventListener("submit", async (event) => {
 
   try {
     const answer = await askBackend(question, history);
-    pending.textEl.textContent = answer;
+    renderMarkdown(pending.textEl, answer);
 
     history.push({ role: "user", text: question });
     history.push({ role: "assistant", text: answer });
 
-    attachActions(pending, { question, textEl: pending.textEl, historyIndex: history.length - 1 });
+    attachActions(pending, {
+      question,
+      textEl: pending.textEl,
+      rawText: answer,
+      historyIndex: history.length - 1,
+    });
   } catch (err) {
-    pending.el.className = "msg error";
-    pending.textEl.textContent = `Error: ${err.message}`;
+    if (err.isRateLimit) {
+      pending.el.remove();
+      showUpgradePrompt(err.resetInSeconds);
+    } else {
+      pending.el.className = "msg error";
+      pending.textEl.textContent = `Error: ${err.message}`;
+    }
   } finally {
     sendBtn.disabled = false;
   }
