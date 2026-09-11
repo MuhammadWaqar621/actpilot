@@ -5,6 +5,7 @@ from pathlib import Path
 from fpdf import FPDF
 
 LOGO_PATH = Path(__file__).resolve().parents[3] / "extension" / "src" / "icons" / "icon128.png"
+QUERYNEST_MARK_PATH = Path(__file__).resolve().parents[2] / "assets" / "querynest-mark.png"
 FONT_REGULAR = Path("C:/Windows/Fonts/segoeui.ttf")
 FONT_BOLD = Path("C:/Windows/Fonts/segoeuib.ttf")
 
@@ -28,19 +29,48 @@ def _strip_markdown(text: str) -> str:
     return text
 
 
+class ChatPDF(FPDF):
+    """Adds the ActPilot watermark and a "Developed by QueryNest" footer to
+    every page automatically - fpdf2 calls footer() itself on each page
+    break and at final output, so this stays correct even when a long chat
+    spans multiple pages."""
+
+    font_name = "Helvetica"
+
+    def header(self) -> None:
+        if not LOGO_PATH.exists():
+            return
+        size = 130
+        cx, cy = self.w / 2, self.h / 2
+        with self.local_context(fill_opacity=0.06, stroke_opacity=0.06):
+            with self.rotation(30, cx, cy):
+                self.image(str(LOGO_PATH), x=cx - size / 2, y=cy - size / 2, w=size, h=size)
+
+    def footer(self) -> None:
+        self.set_y(-15)
+        self.set_font(self.font_name, "", 8)
+        self.set_text_color(*GRAY)
+        x = self.l_margin
+        if QUERYNEST_MARK_PATH.exists():
+            mark_h = 4
+            self.image(str(QUERYNEST_MARK_PATH), x=x, y=self.get_y() + 2, h=mark_h)
+            x += mark_h + 2
+        self.set_xy(x, self.get_y())
+        self.cell(0, 8, "Developed by QueryNest", align="L")
+
+
 def build_chat_pdf(messages: list[dict], page_title: str | None = None) -> bytes:
     """messages: [{"role": "user"|"assistant", "text": str}, ...]"""
-    pdf = FPDF()
+    pdf = ChatPDF()
     pdf.set_auto_page_break(auto=True, margin=18)
-    pdf.add_page()
 
-    unicode_font = FONT_REGULAR.exists() and FONT_BOLD.exists()
-    if unicode_font:
+    if FONT_REGULAR.exists() and FONT_BOLD.exists():
         pdf.add_font("body", "", str(FONT_REGULAR))
         pdf.add_font("body", "B", str(FONT_BOLD))
-        font = "body"
-    else:
-        font = "Helvetica"
+        pdf.font_name = "body"
+    font = pdf.font_name
+
+    pdf.add_page()
 
     if LOGO_PATH.exists():
         pdf.image(str(LOGO_PATH), x=10, y=10, w=12, h=12)
