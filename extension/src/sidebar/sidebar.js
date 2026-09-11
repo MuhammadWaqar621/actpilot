@@ -26,7 +26,7 @@ function addMessage(role, text) {
 }
 
 function closeAllRedoMenus() {
-  document.querySelectorAll(".redo-menu").forEach((menu) => (menu.hidden = true));
+  document.querySelectorAll(".redo-menu.open").forEach((menu) => menu.classList.remove("open"));
 }
 
 function attachActions(bubble, exchange) {
@@ -55,7 +55,6 @@ function attachActions(bubble, exchange) {
 
   const redoMenu = document.createElement("div");
   redoMenu.className = "redo-menu";
-  redoMenu.hidden = true;
   [
     ["retry", "Try again"],
     ["shorter", "Shorter"],
@@ -64,7 +63,7 @@ function attachActions(bubble, exchange) {
     const item = document.createElement("button");
     item.textContent = label;
     item.addEventListener("click", () => {
-      redoMenu.hidden = true;
+      redoMenu.classList.remove("open");
       regenerate(exchange, mode);
     });
     redoMenu.appendChild(item);
@@ -72,9 +71,9 @@ function attachActions(bubble, exchange) {
 
   redoBtn.addEventListener("click", (event) => {
     event.stopPropagation();
-    const willOpen = redoMenu.hidden;
+    const willOpen = !redoMenu.classList.contains("open");
     closeAllRedoMenus();
-    redoMenu.hidden = !willOpen;
+    redoMenu.classList.toggle("open", willOpen);
   });
 
   redoWrap.appendChild(redoBtn);
