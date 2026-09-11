@@ -8,21 +8,12 @@
   <body>
     <header>
       <h1>ActPilot</h1>
-      <button id="settingsToggle" title="Settings">⚙</button>
     </header>
-
-    <section id="settingsPanel" hidden>
-      <label>
-        Backend URL
-        <input id="backendUrl" type="text" placeholder="http://localhost:8000" />
-      </label>
-      <button id="saveSettings">Save</button>
-    </section>
 
     <main id="messages"></main>
 
     <form id="chatForm">
-      <textarea id="question" rows="2" placeholder="Ask about this page…" required></textarea>
+      <textarea id="question" rows="2" placeholder="Ask about this page… (Enter to send, Shift+Enter for a new line)" required></textarea>
       <button type="submit" id="sendBtn">Send</button>
     </form>
 
