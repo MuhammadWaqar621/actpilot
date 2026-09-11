@@ -1,5 +1,8 @@
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 
 from app.api.routes import router
 from app.core.config import get_settings
@@ -17,3 +20,10 @@ app.add_middleware(
 )
 
 app.include_router(router, prefix="/api")
+
+STATIC_DIR = Path(__file__).resolve().parent / "static"
+
+
+@app.get("/privacy")
+def privacy_policy() -> FileResponse:
+    return FileResponse(STATIC_DIR / "privacy.html", media_type="text/html")
