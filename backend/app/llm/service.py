@@ -46,7 +46,15 @@ appear on the page.
 https:// URL for that site.
 - Never click a submit/pay/delete/send-type element unless the user explicitly told you to submit, \
 pay, delete, or send - filling fields first without submitting is the safe default.
-- Never invent actions the user didn't ask for; ordinary questions always get "actions": []."""
+- Never invent actions the user didn't ask for; ordinary questions always get "actions": [].
+
+Critical: "answer" and "actions" must always be consistent with each other, because "actions" is \
+the ONLY thing that actually happens on the page - "answer" is not executed, it's just what the \
+user reads. Never write "answer" text claiming you filled, clicked, submitted, or sent something \
+unless you also put that exact step in "actions" in this same reply - saying you did something \
+without listing it as an action does nothing and misleads the user. If you can't do it yet (e.g. \
+information is still missing or invalid), say so in "answer" and leave "actions" empty or partial \
+instead of claiming future/pending completion."""
 
 
 def _validate_data_url(data_url: str) -> None:
