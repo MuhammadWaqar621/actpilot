@@ -1,0 +1,31 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>ActPilot</title>
+    <link rel="stylesheet" href="sidebar.css" />
+  </head>
+  <body>
+    <header>
+      <h1>ActPilot</h1>
+      <button id="settingsToggle" title="Settings">⚙</button>
+    </header>
+
+    <section id="settingsPanel" hidden>
+      <label>
+        Backend URL
+        <input id="backendUrl" type="text" placeholder="http://localhost:8000" />
+      </label>
+      <button id="saveSettings">Save</button>
+    </section>
+
+    <main id="messages"></main>
+
+    <form id="chatForm">
+      <textarea id="question" rows="2" placeholder="Ask about this page…" required></textarea>
+      <button type="submit" id="sendBtn">Send</button>
+    </form>
+
+    <script src="sidebar.js"></script>
+  </body>
+</html>

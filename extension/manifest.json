@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "ActPilot",
+  "version": "0.1.0",
+  "description": "AI agent that reads the page you're on and answers questions about it.",
+  "permissions": ["sidePanel", "storage", "activeTab", "scripting"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "src/background/background.js"
+  },
+  "action": {
+    "default_title": "Open ActPilot"
+  },
+  "side_panel": {
+    "default_path": "src/sidebar/sidebar.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/content/content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
