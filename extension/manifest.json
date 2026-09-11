@@ -3,7 +3,7 @@
   "name": "ActPilot",
   "version": "0.1.0",
   "description": "AI agent that reads the page you're on and answers questions about it.",
-  "permissions": ["sidePanel", "storage", "activeTab", "scripting"],
+  "permissions": ["sidePanel", "activeTab", "scripting"],
   "host_permissions": ["<all_urls>"],
   "icons": {
     "16": "src/icons/icon16.png",
