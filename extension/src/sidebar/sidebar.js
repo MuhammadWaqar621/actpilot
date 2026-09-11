@@ -123,21 +123,31 @@ function closeAllRedoMenus() {
   document.querySelectorAll(".redo-menu.open").forEach((menu) => menu.classList.remove("open"));
 }
 
+const COPY_ICON =
+  '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+const CHECK_ICON =
+  '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+
 function attachMessageActions(bubble, exchange) {
   const actions = document.createElement("div");
   actions.className = "msg-actions";
 
   const copyBtn = document.createElement("button");
-  copyBtn.className = "action-btn";
-  copyBtn.textContent = "Copy";
+  copyBtn.className = "action-btn icon-btn";
+  copyBtn.title = "Copy";
+  copyBtn.innerHTML = COPY_ICON;
   copyBtn.addEventListener("click", async () => {
     try {
       await navigator.clipboard.writeText(exchange.rawText);
-      copyBtn.textContent = "Copied";
+      copyBtn.innerHTML = CHECK_ICON;
+      copyBtn.title = "Copied";
     } catch {
-      copyBtn.textContent = "Couldn't copy";
+      copyBtn.title = "Couldn't copy";
     }
-    setTimeout(() => (copyBtn.textContent = "Copy"), 1200);
+    setTimeout(() => {
+      copyBtn.innerHTML = COPY_ICON;
+      copyBtn.title = "Copy";
+    }, 1200);
   });
 
   const redoWrap = document.createElement("div");
@@ -172,8 +182,8 @@ function attachMessageActions(bubble, exchange) {
 
   redoWrap.appendChild(redoBtn);
   redoWrap.appendChild(redoMenu);
-  actions.appendChild(copyBtn);
   actions.appendChild(redoWrap);
+  actions.appendChild(copyBtn);
   bubble.el.appendChild(actions);
 }
 
