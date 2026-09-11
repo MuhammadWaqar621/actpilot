@@ -121,15 +121,51 @@ function renderMarkdown(container, text) {
 
 function addMessage(role, text) {
   suggestionsEl.hidden = true;
+  downloadBtn.hidden = false;
+
   const el = document.createElement("div");
   el.className = `msg ${role}`;
   const textEl = document.createElement("div");
   textEl.className = "msg-text";
   textEl.textContent = text;
   el.appendChild(textEl);
-  messagesEl.appendChild(el);
+
+  let avatarWrap = null;
+  if (role === "assistant") {
+    const row = document.createElement("div");
+    row.className = "msg-row";
+    avatarWrap = document.createElement("div");
+    avatarWrap.className = "avatar-wrap";
+    const avatar = document.createElement("img");
+    avatar.className = "avatar";
+    avatar.src = "../icons/icon48.png";
+    avatar.alt = "ActPilot";
+    avatarWrap.appendChild(avatar);
+    row.appendChild(avatarWrap);
+    row.appendChild(el);
+    messagesEl.appendChild(row);
+  } else {
+    messagesEl.appendChild(el);
+  }
+
   messagesEl.scrollTop = messagesEl.scrollHeight;
-  return { el, textEl };
+  return { el, textEl, avatarWrap };
+}
+
+// Loading state shown while waiting on a reply: a typing-dots indicator in
+// the bubble plus a spinning ring around ActPilot's avatar, instead of a
+// plain "Thinking..." string.
+function setThinking(pending) {
+  pending.avatarWrap?.classList.add("loading");
+  pending.textEl.replaceChildren();
+  const dots = document.createElement("div");
+  dots.className = "typing-dots";
+  dots.innerHTML = "<span></span><span></span><span></span>";
+  pending.textEl.appendChild(dots);
+}
+
+function clearThinking(pending) {
+  pending.avatarWrap?.classList.remove("loading");
 }
 
 function closeAllRedoMenus() {
@@ -369,14 +405,16 @@ async function regenerate(exchange, mode) {
   const question = modifier ? `${exchange.question}\n\n(${modifier})` : exchange.question;
 
   const previousText = exchange.rawText;
-  exchange.textEl.textContent = "Thinking…";
+  setThinking(exchange);
 
   try {
     const { answer } = await askBackend(question, history.slice(0, exchange.historyIndex - 1));
+    clearThinking(exchange);
     renderMarkdown(exchange.textEl, answer);
     exchange.rawText = answer;
     history[exchange.historyIndex] = { role: "assistant", text: answer };
   } catch (err) {
+    clearThinking(exchange);
     renderMarkdown(exchange.textEl, previousText);
     if (err.isRateLimit) {
       showUpgradePrompt(err.resetInSeconds);
@@ -438,10 +476,12 @@ formEl.addEventListener("submit", async (event) => {
   addMessage("user", question);
   questionEl.value = "";
   sendBtn.disabled = true;
-  const pending = addMessage("assistant", "Thinking…");
+  const pending = addMessage("assistant", "");
+  setThinking(pending);
 
   try {
     const { answer, actionsSummary } = await askBackend(question, history);
+    clearThinking(pending);
     renderMarkdown(pending.textEl, answer);
     if (actionsSummary.length) {
       const note = document.createElement("p");
@@ -456,12 +496,14 @@ formEl.addEventListener("submit", async (event) => {
     attachMessageActions(pending, {
       question,
       textEl: pending.textEl,
+      avatarWrap: pending.avatarWrap,
       rawText: answer,
       historyIndex: history.length - 1,
     });
   } catch (err) {
+    clearThinking(pending);
     if (err.isRateLimit) {
-      pending.el.remove();
+      (pending.el.closest(".msg-row") || pending.el).remove();
       showUpgradePrompt(err.resetInSeconds);
     } else {
       pending.el.className = "msg error";
