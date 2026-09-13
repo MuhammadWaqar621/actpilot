@@ -1,4 +1,4 @@
-const BACKEND_URL = "http://51.20.164.151:8000";
+const BACKEND_URL = "https://actpilot.duckdns.org";
 const FREE_MESSAGE_LIMIT = 50;
 
 const REDO_MODIFIERS = {

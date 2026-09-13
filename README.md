@@ -1,8 +1,9 @@
 # ActPilot
 
 An AI browser agent: a Chrome/Edge extension that reads the page you're on — text, a screenshot,
-and its fillable/clickable elements — and can both **answer questions about it** and **act on it**
-(fill fields, click things, search the web and open results) from a chat side panel.
+and its fillable/clickable elements — and can both **answer questions about it** (including
+rendering charts/graphs when the data calls for one) and **act on it** (fill fields, click things,
+search the web and open results) from a chat side panel.
 
 See [docs/PRODUCT_VISION.md](docs/PRODUCT_VISION.md) for the full product concept and roadmap.
 
@@ -92,9 +93,13 @@ No build step needed — it's plain JS/HTML/CSS.
 3. Click **Load unpacked** and select the `extension/` folder
 4. Click the ActPilot toolbar icon to open the side panel on any page
 
-The backend URL is hardcoded to `http://localhost:8000` — this is a single-machine setup, so
-there's no configuration step. Ask things like "Summarize this page", "Fill this form with my
-name John Doe and email john@example.com", or "Search Google for X and open it".
+The backend URL is hardcoded in `extension/src/sidebar/sidebar.js` (`BACKEND_URL`) rather than
+configurable in the UI. It currently points to `https://actpilot.duckdns.org`, a production
+instance running on AWS behind Caddy (free DuckDNS domain + automatic Let's Encrypt HTTPS, the
+same setup already used for querynest.duckdns.org on the same server) — point it at
+`http://localhost:8000` instead if you're running the backend yourself. Ask things like
+"Summarize this page", "Make a bar chart of X vs Y", "Fill this form with my name John Doe and
+email john@example.com", or "Search Google for X and open it".
 
 ## Project layout
 
@@ -118,8 +123,9 @@ actpilot/
 
 ## Notes
 
-- `CORS_ALLOW_ORIGINS=*` in `.env` is fine for local development only — restrict it before
-  shipping anything beyond your own machine.
+- `CORS_ALLOW_ORIGINS=*` in `.env` works fine since browser extensions send a `chrome-extension://`
+  origin that a specific allow-list can't easily pin down anyway - the real access control here is
+  the per-IP rate limiter, not CORS.
 - Actions never submit, pay, delete, or send anything unless you explicitly asked for that — the
   agent is instructed to fill fields first and stop short of destructive clicks by default.
 - The free-tier message limit is enforced server-side (by IP, resetting every 2 hours) but has no
