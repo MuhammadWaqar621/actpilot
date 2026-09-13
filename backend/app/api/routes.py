@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Request, Response
 
 from app.api.schemas import AnalyzeRequest, AnalyzeResponse, BrowserAction, ExportChatRequest
 from app.core import rate_limit
+from app.core.chart_export import build_chart_image
 from app.core.config import get_settings
 from app.core.pdf_export import build_chat_pdf
 from app.llm.service import answer_page_question
@@ -48,8 +49,12 @@ def analyze(request: AnalyzeRequest, http_request: Request) -> AnalyzeResponse:
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    chart_image = build_chart_image(reply.chart) if reply.chart else None
+
     return AnalyzeResponse(
-        answer=reply.answer, actions=[BrowserAction(**a) for a in reply.actions]
+        answer=reply.answer,
+        actions=[BrowserAction(**a) for a in reply.actions],
+        chart_image=chart_image,
     )
 
 

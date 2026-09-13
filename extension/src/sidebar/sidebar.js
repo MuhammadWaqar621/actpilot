@@ -221,6 +221,63 @@ function addMessage(role, text) {
   return { el, textEl, avatarWrap };
 }
 
+// Charts are rendered server-side (matplotlib) into a PNG data URL - the
+// extension just displays it, with click-to-zoom and a download button.
+function downloadDataUrl(dataUrl, filename) {
+  const a = document.createElement("a");
+  a.href = dataUrl;
+  a.download = filename;
+  a.click();
+}
+
+function openChartModal(dataUrl) {
+  const overlay = document.createElement("div");
+  overlay.className = "chart-modal-overlay";
+  overlay.addEventListener("click", (event) => {
+    if (event.target === overlay) overlay.remove();
+  });
+
+  const modal = document.createElement("div");
+  modal.className = "chart-modal";
+
+  const closeBtn = document.createElement("button");
+  closeBtn.className = "chart-modal-close";
+  closeBtn.setAttribute("aria-label", "Close");
+  closeBtn.textContent = "✕";
+  closeBtn.addEventListener("click", () => overlay.remove());
+
+  const img = document.createElement("img");
+  img.className = "chart-modal-img";
+  img.src = dataUrl;
+  img.alt = "Chart (enlarged)";
+
+  const downloadBtn = document.createElement("button");
+  downloadBtn.className = "chart-download-btn";
+  downloadBtn.textContent = "Download image";
+  downloadBtn.addEventListener("click", () => downloadDataUrl(dataUrl, `actpilot-chart-${Date.now()}.png`));
+
+  modal.appendChild(closeBtn);
+  modal.appendChild(img);
+  modal.appendChild(downloadBtn);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+}
+
+function renderChartImage(container, dataUrl) {
+  const wrap = document.createElement("div");
+  wrap.className = "chart-wrap";
+  wrap.title = "Click to enlarge";
+
+  const img = document.createElement("img");
+  img.className = "chart-img";
+  img.src = dataUrl;
+  img.alt = "Chart";
+
+  wrap.appendChild(img);
+  wrap.addEventListener("click", () => openChartModal(dataUrl));
+  container.appendChild(wrap);
+}
+
 // Loading state shown while waiting on a reply: a typing-dots indicator in
 // the bubble plus a spinning ring around ActPilot's avatar, instead of a
 // plain "Thinking..." string.
@@ -435,7 +492,7 @@ async function askBackend(question, historyForContext) {
     actionsSummary = await executeActions(tab.id, data.actions);
   }
 
-  return { answer: data.answer, actionsSummary };
+  return { answer: data.answer, actionsSummary, chartImage: data.chart_image || null };
 }
 
 // --- Free-tier message cap ------------------------------------------------
@@ -477,9 +534,10 @@ async function regenerate(exchange, mode) {
   setThinking(exchange);
 
   try {
-    const { answer } = await askBackend(question, history.slice(0, exchange.historyIndex - 1));
+    const { answer, chartImage } = await askBackend(question, history.slice(0, exchange.historyIndex - 1));
     clearThinking(exchange);
     renderMarkdown(exchange.textEl, answer);
+    if (chartImage) renderChartImage(exchange.textEl, chartImage);
     exchange.rawText = answer;
     history[exchange.historyIndex] = { role: "assistant", text: answer };
   } catch (err) {
@@ -549,9 +607,10 @@ formEl.addEventListener("submit", async (event) => {
   setThinking(pending);
 
   try {
-    const { answer, actionsSummary } = await askBackend(question, history);
+    const { answer, actionsSummary, chartImage } = await askBackend(question, history);
     clearThinking(pending);
     renderMarkdown(pending.textEl, answer);
+    if (chartImage) renderChartImage(pending.textEl, chartImage);
     if (actionsSummary.length) {
       const note = document.createElement("p");
       note.className = "action-note";

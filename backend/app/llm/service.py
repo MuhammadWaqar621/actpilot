@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 
 from openai import RateLimitError
 
+from app.core.chart_export import CHART_TYPES
 from app.core.config import get_settings
 from app.llm.providers import azure_openai, groq
 
@@ -20,15 +21,27 @@ You are given:
 - Optionally, a short prior conversation about this same page
 
 You must always reply with a single JSON object, and nothing else, in exactly this shape:
-{"answer": "<what to say to the user>", "actions": []}
+{"answer": "<what to say to the user>", "actions": [], "chart": null}
 
 If the user is asking about the page (summarizing, extracting, explaining, comparing, etc.), \
 answer using only the page content provided - if the answer isn't there, say so plainly instead \
 of guessing. Be concise and direct, and quote or reference the specific part of the page you're \
-basing your answer on when useful. Use "actions": [] for these.
+basing your answer on when useful. Use "actions": [] and "chart": null for these.
 
 If the user is just greeting you or making small talk unrelated to the page, respond naturally \
-and briefly in "answer", with "actions": [].
+and briefly in "answer", with "actions": [] and "chart": null.
+
+If the user asks for a chart, graph, or visualization of some numeric data (or the data on the \
+page is a small set of clearly numeric categories the user is comparing), set "chart" to:
+{"type": "<see below>", "title": "<short title>", "labels": ["<category>", ...], "values": [<number>, ...]}
+- "labels" and "values" must be the same length, and "values" must be plain numbers.
+- Pick "type" from: "bar" (comparing categories - the common default), "barh" (same, but with many \
+or long category names), "pie" (parts of a whole), "line" (a trend over an ordered sequence like \
+dates), "area" (a line chart with the area beneath it filled in, for emphasizing volume over time), \
+"scatter" (individual data points, no implied trend/connection), "histogram" (the distribution of \
+one set of numeric values - "labels" can be omitted or approximate for this one).
+- Only include a chart when it's genuinely warranted by the request or the data - don't add one \
+to an ordinary text answer just because a number appears in it.
 
 If the user explicitly asks you to interact with the page, put one or more steps in "actions", \
 executed in order, using ONLY these three step shapes:
@@ -116,6 +129,39 @@ def _build_messages(
 class AgentReply:
     answer: str
     actions: list[dict] = field(default_factory=list)
+    chart: dict | None = None
+
+
+def _parse_chart(chart: object) -> dict | None:
+    if not isinstance(chart, dict):
+        return None
+    chart_type = chart.get("type")
+    labels = chart.get("labels")
+    values = chart.get("values")
+    if chart_type not in CHART_TYPES:
+        return None
+    if not isinstance(values, list) or not values:
+        return None
+    if not all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in values):
+        return None
+
+    if chart_type == "histogram":
+        # A histogram bins raw values itself - labels are optional/approximate.
+        if not isinstance(labels, list) or len(labels) != len(values):
+            labels = [str(i + 1) for i in range(len(values))]
+    else:
+        if not isinstance(labels, list) or len(labels) != len(values):
+            return None
+        if not all(isinstance(x, str) for x in labels):
+            return None
+
+    title = chart.get("title")
+    return {
+        "type": chart_type,
+        "title": title if isinstance(title, str) else "",
+        "labels": labels,
+        "values": [float(v) for v in values],
+    }
 
 
 def _parse_action(action: object, element_ids: set[str]) -> dict | None:
@@ -158,7 +204,9 @@ def _parse_reply(raw: str, element_ids: set[str]) -> AgentReply:
     if isinstance(raw_actions, list):
         actions = [a for a in (_parse_action(item, element_ids) for item in raw_actions) if a]
 
-    return AgentReply(answer=answer, actions=actions)
+    chart = _parse_chart(data.get("chart"))
+
+    return AgentReply(answer=answer, actions=actions, chart=chart)
 
 
 def _call_provider(

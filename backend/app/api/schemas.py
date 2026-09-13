@@ -45,6 +45,9 @@ class BrowserAction(BaseModel):
 class AnalyzeResponse(BaseModel):
     answer: str
     actions: list[BrowserAction] = Field(default_factory=list)
+    chart_image: str | None = Field(
+        default=None, description="Base64 PNG data URL of a rendered chart, when requested"
+    )
 
 
 class ExportChatRequest(BaseModel):
