@@ -89,12 +89,76 @@ function appendInline(parent, text) {
   }
 }
 
+function isTableRow(line) {
+  return /^\s*\|.*\|\s*$/.test(line);
+}
+
+function isTableSeparatorRow(line) {
+  const cells = splitTableRow(line);
+  return cells.length > 0 && cells.every((c) => /^:?-+:?$/.test(c.trim()));
+}
+
+function splitTableRow(line) {
+  return line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|");
+}
+
 function renderMarkdown(container, text) {
   container.replaceChildren();
   const lines = text.split("\n");
   let listEl = null;
+  let i = 0;
 
-  for (const line of lines) {
+  while (i < lines.length) {
+    const line = lines[i];
+
+    if (isTableRow(line) && i + 1 < lines.length && isTableSeparatorRow(lines[i + 1])) {
+      listEl = null;
+      const table = document.createElement("table");
+      table.className = "md-table";
+
+      const thead = document.createElement("thead");
+      const headRow = document.createElement("tr");
+      splitTableRow(line).forEach((cell) => {
+        const th = document.createElement("th");
+        appendInline(th, cell.trim());
+        headRow.appendChild(th);
+      });
+      thead.appendChild(headRow);
+      table.appendChild(thead);
+
+      i += 2; // skip the header row and the |---|---| separator
+      const tbody = document.createElement("tbody");
+      while (i < lines.length && isTableRow(lines[i])) {
+        const row = document.createElement("tr");
+        splitTableRow(lines[i]).forEach((cell) => {
+          const td = document.createElement("td");
+          appendInline(td, cell.trim());
+          row.appendChild(td);
+        });
+        tbody.appendChild(row);
+        i++;
+      }
+      table.appendChild(tbody);
+
+      const wrap = document.createElement("div");
+      wrap.className = "md-table-wrap";
+      wrap.appendChild(table);
+      container.appendChild(wrap);
+      continue;
+    }
+
+    const headingMatch = line.match(/^\s{0,3}(#{1,6})\s+(.*)/);
+    if (headingMatch) {
+      listEl = null;
+      const level = Math.min(headingMatch[1].length, 6);
+      const heading = document.createElement(`h${level}`);
+      heading.className = "md-heading";
+      appendInline(heading, headingMatch[2]);
+      container.appendChild(heading);
+      i++;
+      continue;
+    }
+
     const bulletMatch = line.match(/^\s*[-*]\s+(.*)/);
     const numberedMatch = line.match(/^\s*\d+[.)]\s+(.*)/);
 
@@ -107,15 +171,20 @@ function renderMarkdown(container, text) {
       const li = document.createElement("li");
       appendInline(li, (bulletMatch || numberedMatch)[1]);
       listEl.appendChild(li);
+      i++;
       continue;
     }
 
     listEl = null;
-    if (line.trim() === "") continue;
+    if (line.trim() === "") {
+      i++;
+      continue;
+    }
 
     const p = document.createElement("p");
     appendInline(p, line);
     container.appendChild(p);
+    i++;
   }
 }
 
