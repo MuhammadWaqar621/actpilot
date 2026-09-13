@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "ActPilot",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "AI agent that reads the page you're on and answers questions about it.",
   "permissions": ["sidePanel", "activeTab", "scripting"],
   "host_permissions": ["<all_urls>"],
