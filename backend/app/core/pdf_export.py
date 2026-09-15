@@ -4,8 +4,21 @@ from pathlib import Path
 
 from fpdf import FPDF
 
-LOGO_PATH = Path(__file__).resolve().parents[3] / "extension" / "src" / "icons" / "icon128.png"
+# Both assets live inside backend/assets - deliberately NOT under
+# extension/ (a sibling directory one level up) - because on Vercel this
+# backend is deployed as its own isolated project rooted at backend/, so
+# nothing outside backend/ is present at runtime.
+LOGO_PATH = Path(__file__).resolve().parents[2] / "assets" / "icon128.png"
 QUERYNEST_MARK_PATH = Path(__file__).resolve().parents[2] / "assets" / "querynest-mark.png"
+
+# Segoe UI is only present on Windows, so this only resolves locally on a
+# Windows dev machine. On Vercel (Linux) these .exists() checks below are
+# False and fpdf2 falls back to its built-in Helvetica core font instead of
+# crashing - fine for ASCII, but Helvetica has no bold/unicode glyph
+# coverage beyond latin-1, so non-ASCII chat text (e.g. curly quotes not in
+# _ASCII_REPLACEMENTS, or non-Latin scripts) may render as blank/missing
+# glyphs in production PDFs. If that matters, bundle a real TTF (e.g.
+# DejaVuSans) under backend/assets/fonts/ and point these at it instead.
 FONT_REGULAR = Path("C:/Windows/Fonts/segoeui.ttf")
 FONT_BOLD = Path("C:/Windows/Fonts/segoeuib.ttf")
 

@@ -84,6 +84,49 @@ uvicorn app.main:app --reload --port 8000
 
 Check it's up: `GET http://localhost:8000/api/health` → `{"status": "ok"}`
 
+## Deploying the backend to Vercel
+
+`backend/` is set up to deploy as its own, self-contained Vercel project
+(Vercel's Python runtime auto-detects the FastAPI `app` object in
+`app/main.py` and routes every request - including `/privacy` - to it with no
+extra routing config needed). To deploy:
+
+1. In the Vercel dashboard, import this repo and set the project's **Root
+   Directory** to `backend` (this is a monorepo - `extension/`, `docs/`, and
+   `store-assets/` are not part of this or any Vercel deployment; the
+   extension in particular is a Chrome extension, not a website, and can't be
+   deployed here at all).
+2. Set these environment variables on the Vercel project (Settings ->
+   Environment Variables) - see `backend/.env.example` for the full list and
+   descriptions: `LLM_PROVIDER`, `AZURE_LLM_ENDPOINT`, `AZURE_LLM_API_KEY`,
+   `AZURE_LLM_MODEL`, `AZURE_LLM_API_VERSION`, `GROQ_API_KEY`,
+   `GROQ_LLM_MODEL`, `CORS_ALLOW_ORIGINS`, `MAX_PAGE_TEXT_CHARS`.
+3. Deploy. Then point `BACKEND_URL` in `extension/src/sidebar/sidebar.js` at
+   the resulting `https://<project>.vercel.app` domain, reload the unpacked
+   extension, note its `chrome-extension://<id>` origin, and set
+   `CORS_ALLOW_ORIGINS` to that origin on Vercel (redeploy/redeploy-env-only
+   to pick it up) instead of leaving it as `*`.
+
+Two things to know about this backend once it's running on Vercel's
+serverless functions rather than a long-lived process:
+
+- **Nothing is written to local disk that needs to persist.** Chart images
+  (`app/core/chart_export.py`) and exported PDFs (`app/core/pdf_export.py`)
+  are both built entirely in memory (`io.BytesIO`) and returned directly in
+  the same HTTP response that triggered them - there's no
+  generate-now/fetch-later flow and nothing assumes a writable, persistent
+  disk. Vercel's function-local `/tmp` is never used and isn't needed.
+- **The per-IP rate limiter (`app/core/rate_limit.py`) is in-process memory**
+  (a plain dict), which does not work reliably across Vercel's serverless
+  functions: concurrent invocations can land on different instances that
+  don't share this dict, and a cold start resets an instance's counts to
+  zero. In practice this means the advertised "50 messages / 2h" cap is
+  best-effort on Vercel, not exact. This is called out as a soft usage cap
+  rather than a security boundary (see the "Notes" section below), so it's
+  left as-is rather than rewritten onto Redis/Upstash - swap it for a real
+  shared store first if this limit ever needs to be exact or load-bearing
+  for something more sensitive than "keep casual abuse down."
+
 ## Extension setup
 
 No build step needed — it's plain JS/HTML/CSS.
